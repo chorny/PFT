@@ -49,6 +49,9 @@ use YAML::Tiny;
 use PFT::Date;
 
 our $DEFAULT_ENC = 'utf-8';
+our %DEFAULT_OPTS = (
+    hide => [0, \&CORE::int],
+);
 
 my $params_check = sub {
     my $params = shift;
@@ -83,7 +86,10 @@ sub new {
         encoding => $enc,
         date => $opts{date},
         tags => $opts{tags} || [],
-        opts => $opts{opts} || {},
+        opts => $opts{opts} || {
+            map { $_ => $DEFAULT_OPTS{$_}->[0] }
+            keys %DEFAULT_OPTS
+        },
     }, $cls;
 }
 
@@ -134,9 +140,16 @@ sub load {
         }],
         encoding => $enc,
         date => $date,
-        opts => !exists $hdr->{Options} ? undef : {
-            map { $decode->($_) } %{$hdr->{Options}}
-        },
+        opts => !exists $hdr->{Options} ? undef : { do {
+            my $o = $hdr->{Options};
+
+            map { $decode->($_) }
+            map { $_ => exists $DEFAULT_OPTS{$_}
+                      ? $DEFAULT_OPTS{$_}->[1]->($o->{$_})
+                      : $o->{$_}
+            }
+            keys %$o;
+        }},
     };
     $params_check->($self);
 
